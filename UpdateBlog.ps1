@@ -95,7 +95,23 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 5: Add changes to Git
+# Step 5: Stash changes before pulling updates from GitHub
+Write-Host "Stashing local changes before pulling from GitHub..."
+git stash save "Stashing changes before pulling latest updates"
+
+# Step 6: Pull the latest changes from GitHub
+Write-Host "Pulling latest changes from GitHub..."
+$gitPullResult = git pull origin main --rebase
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Git pull failed: $gitPullResult"
+    exit 1
+}
+
+# Step 7: Apply stashed changes back to the working directory
+Write-Host "Applying stashed changes..."
+git stash pop
+
+# Step 8: Add changes to Git
 Write-Host "Staging changes for Git..."
 $hasChanges = (git status --porcelain) -ne ""
 if (-not $hasChanges) {
@@ -105,7 +121,7 @@ if (-not $hasChanges) {
     git add .
 }
 
-# Step 6: Commit changes with a dynamic message
+# Step 9: Commit changes with a dynamic message
 $commitMessage = "New Blog Post on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 $hasStagedChanges = (git diff --cached --name-only) -ne ""
 if (-not $hasStagedChanges) {
@@ -119,7 +135,7 @@ if (-not $hasStagedChanges) {
     }
 }
 
-# Step 7: Push all changes to the main branch (or master)
+# Step 10: Push all changes to the main branch (or master)
 Write-Host "Deploying to GitHub Pages..."
 $pushResult = git push origin main
 if ($LASTEXITCODE -ne 0) {
@@ -127,7 +143,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 8: Push the public folder to the gh-pages branch using subtree split and force push
+# Step 11: Push the public folder to the gh-pages branch using subtree split and force push
 Write-Host "Deploying to GitHub Pages..."
 
 # Check if the temporary branch exists and delete it
