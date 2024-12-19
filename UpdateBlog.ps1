@@ -74,7 +74,7 @@ if (-not (Test-Path ".git")) {
     }
 }
 
-# Step 2: Sync posts from Obsidian to Hugo content folder using Robocopy
+# Step 2A: Sync posts from Obsidian to Hugo content folder using Robocopy
 Write-Host "Syncing posts from Obsidian..."
 
 if (-not (Test-Path $sourcePath)) {
@@ -95,6 +95,22 @@ if ($LASTEXITCODE -ge 8) {
     Write-Error "Robocopy failed with exit code $LASTEXITCODE."
     exit 1
 }
+# Step 2B: Process Markdown files with Python script to handle image links
+Write-Host "Processing image links in Markdown files..."
+if (-not (Test-Path "images.py")) {
+    Write-Error "Python script images.py not found."
+    exit 1
+}
+
+# Execute the Python script
+try {
+    & $pythonCommand images.py
+    Write-Host "Image links processed successfully."
+} catch {
+    Write-Error "Failed to process image links."
+    exit 1
+}
+
 
 # Step 3: Update baseURL for deployment
 Write-Host "Updating baseURL for deployment..."

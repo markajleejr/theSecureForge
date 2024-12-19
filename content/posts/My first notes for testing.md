@@ -9,4 +9,4 @@ tags:
 
 This is me testing the process of creating my own blog pipeline using NetworkChuck's advise
 image:
-![[Pasted image 20241209173445.png]]
+!![Image Description](/images/Pasted%20image%2020241209173445.png)
