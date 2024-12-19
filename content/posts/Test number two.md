@@ -8,4 +8,4 @@ tags:
   - two
 ---
 222222222
-!![Image Description](/images/Pasted%20image%2020241210142549.png)
+![[Pasted image 20241210142549.png]]

@@ -1,4 +1,4 @@
-baseURL = "https://markajleejr.github.io/theSecureForge/"
+baseURL = "https://example.com/"
 languageCode = "en-us"
 # Add it only if you keep the theme in the `themes` directory.
 # Remove it if you use the theme as a remote Hugo Module.

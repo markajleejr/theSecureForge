@@ -1,10 +1,11 @@
 # PowerShell Script for Windows
 
-# Set variables for paths and repository
+# Set variables for Obsidian to Hugo copy
 $sourcePath = "C:\Users\marka\Documents\Mark's Vault\posts"
 $destinationPath = "C:\Users\marka\Documents\theSecureForge\content\posts"
-$hugoConfigPath = "C:\Users\marka\Documents\theSecureForge\Hugo.toml"
-$myrepo = "theSecureForge"
+
+# Set Github repo 
+$myrepo = "reponame"
 
 # Set error handling
 $ErrorActionPreference = "Stop"
@@ -17,48 +18,22 @@ Set-Location $ScriptDir
 # Check for required commands
 $requiredCommands = @('git', 'hugo')
 
+# Check for Python command (python or python3)
+if (Get-Command 'python' -ErrorAction SilentlyContinue) {
+    $pythonCommand = 'python'
+} elseif (Get-Command 'python3' -ErrorAction SilentlyContinue) {
+    $pythonCommand = 'python3'
+} else {
+    Write-Error "Python is not installed or not in PATH."
+    exit 1
+}
+
 foreach ($cmd in $requiredCommands) {
     if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
         Write-Error "$cmd is not installed or not in PATH."
         exit 1
     }
 }
-
-# Function to update baseURL in Hugo.toml
-function Update-BaseURL {
-    param (
-        [string]$newBaseURL
-    )
-    if (-not (Test-Path $hugoConfigPath)) {
-        Write-Error "Hugo configuration file not found: $hugoConfigPath"
-        exit 1
-    }
-
-    $configContent = Get-Content $hugoConfigPath
-    $updatedContent = $configContent -replace '^baseURL\s*=\s*".*"$', "baseURL = `"$newBaseURL`""
-    Set-Content -Path $hugoConfigPath -Value $updatedContent
-}
-
-# Extract the current baseURL from Hugo.toml
-if (-not (Test-Path $hugoConfigPath)) {
-    Write-Error "Hugo configuration file not found: $hugoConfigPath"
-    exit 1
-}
-
-# Read and join the Hugo configuration content
-$configContent = (Get-Content $hugoConfigPath -Raw)
-Write-Host "Hugo config content: $configContent"
-
-# Use regex to match the baseURL
-if ($configContent -match 'baseURL\s*=\s*["''](.*?)["'']') {
-    $originalBaseURL = $matches[1]
-    Write-Host "Original baseURL extracted: $originalBaseURL"
-} else {
-    Write-Error "Could not extract baseURL from Hugo config file. Ensure it is properly defined."
-    $originalBaseURL = "/"
-}
-
-
 
 # Step 1: Check if Git is initialized, and initialize if necessary
 if (-not (Test-Path ".git")) {
@@ -96,9 +71,21 @@ if ($LASTEXITCODE -ge 8) {
     exit 1
 }
 
-# Step 3: Update baseURL for deployment
-Write-Host "Updating baseURL for deployment..."
-Update-BaseURL -newBaseURL "https://markajleejr.github.io/theSecureForge/"
+# Step 3: Process Markdown files with Python script to handle image links
+Write-Host "Processing image links in Markdown files..."
+$pythonScriptPath = Join-Path $ScriptDir "images.py"
+if (-not (Test-Path $pythonScriptPath)) {
+    Write-Error "Python script images.py not found."
+    exit 1
+}
+
+# Execute the Python script
+try {
+    & $pythonCommand $pythonScriptPath
+} catch {
+    Write-Error "Failed to process image links."
+    exit 1
+}
 
 # Step 4: Build the Hugo site
 Write-Host "Building the Hugo site..."
@@ -108,15 +95,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 5: Revert baseURL to original value
-Write-Host "Reverting baseURL to original value..."
-Update-BaseURL -newBaseURL $originalBaseURL
-
-# Step 6: Stash changes before pulling updates from GitHub
+# Step 5: Stash changes before pulling updates from GitHub
 Write-Host "Stashing local changes before pulling from GitHub..."
 git stash save "Stashing changes before pulling latest updates"
 
-# Step 7: Pull the latest changes from GitHub
+# Step 6: Pull the latest changes from GitHub
 Write-Host "Pulling latest changes from GitHub..."
 $gitPullResult = git pull origin main --rebase
 if ($LASTEXITCODE -ne 0) {
@@ -124,11 +107,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 8: Apply stashed changes back to the working directory
+# Step 7: Apply stashed changes back to the working directory
 Write-Host "Applying stashed changes..."
 git stash pop
 
-# Step 9: Add changes to Git
+# Step 8: Add changes to Git
 Write-Host "Staging changes for Git..."
 $hasChanges = (git status --porcelain) -ne ""
 if (-not $hasChanges) {
@@ -138,7 +121,7 @@ if (-not $hasChanges) {
     git add .
 }
 
-# Step 10: Commit changes with a dynamic message
+# Step 9: Commit changes with a dynamic message
 $commitMessage = "New Blog Post on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 $hasStagedChanges = (git diff --cached --name-only) -ne ""
 if (-not $hasStagedChanges) {
@@ -152,7 +135,7 @@ if (-not $hasStagedChanges) {
     }
 }
 
-# Step 11: Push all changes to the main branch (or master)
+# Step 10: Push all changes to the main branch (or master)
 Write-Host "Deploying to GitHub Pages..."
 $pushResult = git push origin main
 if ($LASTEXITCODE -ne 0) {
@@ -160,7 +143,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 12: Push the public folder to the gh-pages branch using subtree split and force push
+# Step 11: Push the public folder to the gh-pages branch using subtree split and force push
 Write-Host "Deploying to GitHub Pages..."
 
 # Check if the temporary branch exists and delete it
