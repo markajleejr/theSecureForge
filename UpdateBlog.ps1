@@ -3,7 +3,7 @@
 # Set variables for paths and repository
 $sourcePath = "C:\Users\marka\Documents\Mark's Vault\posts"
 $destinationPath = "C:\Users\marka\Documents\theSecureForge\content\posts"
-$hugoConfigPath = "C:\Users\marka\Documents\theSecureForge\Hugo.toml"
+#$hugoConfigPath = "C:\Users\marka\Documents\theSecureForge\Hugo.toml" --disabled Hugo auto update
 $myrepo = "theSecureForge"
 
 # Set error handling
@@ -24,7 +24,7 @@ foreach ($cmd in $requiredCommands) {
     }
 }
 
-# Function to update baseURL in Hugo.toml
+<# # Function to update baseURL in Hugo.toml --disabled Hugo auto update
 function Update-BaseURL {
     param (
         [string]$newBaseURL
@@ -34,9 +34,17 @@ function Update-BaseURL {
         exit 1
     }
 
-    $configContent = Get-Content $hugoConfigPath
-    $updatedContent = $configContent -replace '^baseURL\s*=\s*".*"$', "baseURL = `"$newBaseURL`""
-    Set-Content -Path $hugoConfigPath -Value $updatedContent
+    try {
+        $configContent = Get-Content $hugoConfigPath -Raw -Encoding UTF8
+		$updatedContent = $configContent -replace '(?m)^\s*baseURL\s*=\s*["\''].*?["\'']', "baseURL = `"$newBaseURL`""
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($hugoConfigPath, $updatedContent, $utf8NoBom)
+
+        Write-Host "baseURL successfully updated to: $newBaseURL"
+    } catch {
+        Write-Error "Failed to update baseURL in Hugo configuration file."
+        exit 1
+    }
 }
 
 # Extract the current baseURL from Hugo.toml
@@ -45,20 +53,19 @@ if (-not (Test-Path $hugoConfigPath)) {
     exit 1
 }
 
-# Read and join the Hugo configuration content
-$configContent = (Get-Content $hugoConfigPath -Raw)
-Write-Host "Hugo config content: $configContent"
-
-# Use regex to match the baseURL
-if ($configContent -match 'baseURL\s*=\s*["''](.*?)["'']') {
-    $originalBaseURL = $matches[1]
-    Write-Host "Original baseURL extracted: $originalBaseURL"
-} else {
-    Write-Error "Could not extract baseURL from Hugo config file. Ensure it is properly defined."
-    $originalBaseURL = "/"
-}
-
-
+try {
+    $configContent = Get-Content $hugoConfigPath -Raw -Encoding UTF8
+    if ($configContent -match '(?m)^\s*baseURL\s*=\s*["\''].*?["\'']') {
+		$originalBaseURL = $matches[1]
+        Write-Host "Original baseURL extracted: $originalBaseURL"
+    } else {
+        Write-Error "Could not extract baseURL from Hugo config file. Ensure it is properly defined."
+        $originalBaseURL = "/"
+    }
+} catch {
+    Write-Error "Failed to read Hugo configuration file."
+    exit 1
+} #>
 
 # Step 1: Check if Git is initialized, and initialize if necessary
 if (-not (Test-Path ".git")) {
@@ -76,7 +83,6 @@ if (-not (Test-Path ".git")) {
 
 # Step 2A: Sync posts from Obsidian to Hugo content folder using Robocopy
 Write-Host "Syncing posts from Obsidian..."
-
 if (-not (Test-Path $sourcePath)) {
     Write-Error "Source path does not exist: $sourcePath"
     exit 1
@@ -87,7 +93,6 @@ if (-not (Test-Path $destinationPath)) {
     exit 1
 }
 
-# Use Robocopy to mirror the directories
 $robocopyOptions = @('/MIR', '/Z', '/W:5', '/R:3')
 $robocopyResult = robocopy $sourcePath $destinationPath @robocopyOptions
 
@@ -95,6 +100,7 @@ if ($LASTEXITCODE -ge 8) {
     Write-Error "Robocopy failed with exit code $LASTEXITCODE."
     exit 1
 }
+
 # Step 2B: Process Markdown files with Python script to handle image links
 Write-Host "Processing image links in Markdown files..."
 if (-not (Test-Path "images.py")) {
@@ -102,19 +108,17 @@ if (-not (Test-Path "images.py")) {
     exit 1
 }
 
-# Execute the Python script
 try {
-    & $pythonCommand images.py
+    python images.py
     Write-Host "Image links processed successfully."
 } catch {
     Write-Error "Failed to process image links."
     exit 1
 }
 
-
-# Step 3: Update baseURL for deployment
+<# # Step 3: Update baseURL for deployment --disabled Hugo auto update
 Write-Host "Updating baseURL for deployment..."
-Update-BaseURL -newBaseURL "https://markajleejr.github.io/theSecureForge/"
+Update-BaseURL -newBaseURL "https://markajleejr.github.io/theSecureForge/" #>
 
 # Step 4: Build the Hugo site
 Write-Host "Building the Hugo site..."
@@ -124,91 +128,70 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 5: Revert baseURL to original value
+<# # Step 5: Revert baseURL to original value --disabled Hugo auto update
 Write-Host "Reverting baseURL to original value..."
-Update-BaseURL -newBaseURL $originalBaseURL
+Update-BaseURL -newBaseURL $originalBaseURL #>
 
-# Step 6: Stash changes before pulling updates from GitHub
+<# # Step 6: Stash Hugo.toml changes before pulling updates from GitHub --disabled Hugo auto update
 Write-Host "Stashing local changes before pulling from GitHub..."
-git stash save "Stashing changes before pulling latest updates"
+git stash push -m "Temporary stash for Hugo.toml" Hugo.toml #>
 
 # Step 7: Pull the latest changes from GitHub
 Write-Host "Pulling latest changes from GitHub..."
 $gitPullResult = git pull origin main --rebase
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Git pull failed: $gitPullResult"
-    exit 1
+    if ($gitPullResult -like "*needs merge*") {
+        Write-Error "Merge conflict detected in Hugo.toml. Please resolve the conflict manually."
+        git status
+        exit 1
+    } else {
+        Write-Error "Git pull failed: $gitPullResult"
+        exit 1
+    }
 }
 
-# Step 8: Apply stashed changes back to the working directory
+<# # Step 8: Apply stashed changes back to Hugo.toml --disabled Hugo auto update
 Write-Host "Applying stashed changes..."
-git stash pop
+$gitStashPopResult = git stash pop
+if ($LASTEXITCODE -ne 0) {
+    if ($gitStashPopResult -like "*conflict*") {
+        Write-Error "Merge conflict detected while applying stashed changes. Please resolve the conflict manually."
+        git status
+        exit 1
+    } else {
+        Write-Error "Failed to apply stashed changes: $gitStashPopResult"
+        exit 1
+    }
+} #>
 
 # Step 9: Add changes to Git
 Write-Host "Staging changes for Git..."
-$hasChanges = (git status --porcelain) -ne ""
-if (-not $hasChanges) {
-    Write-Host "No changes to stage."
-} else {
+if ((git status --porcelain) -ne "") {
     Write-Host "Staging changes..."
     git add .
-}
-
-# Step 10: Commit changes with a dynamic message
-$commitMessage = "New Blog Post on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-$hasStagedChanges = (git diff --cached --name-only) -ne ""
-if (-not $hasStagedChanges) {
-    Write-Host "No changes to commit."
-} else {
-    Write-Host "Committing changes..."
+    $commitMessage = "New Blog Post on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     git commit -m "$commitMessage"
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Git commit failed."
         exit 1
     }
+} else {
+    Write-Host "No changes to stage or commit."
 }
 
-# Step 11: Push all changes to the main branch (or master)
+# Step 10: Deploy to GitHub Pages
 Write-Host "Deploying to GitHub Pages..."
-$pushResult = git push origin main
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to push to main branch."
-    exit 1
-}
-
-# Step 12: Push the public folder to the gh-pages branch using subtree split and force push
-Write-Host "Deploying to GitHub Pages..."
-
-# Check if the temporary branch exists and delete it
-$branchExists = git branch --list "gh-pages-deploy"
-if ($branchExists) {
-    git branch -D gh-pages-deploy
-}
-
-# Ensure public folder exists
 if (-not (Test-Path "public")) {
     Write-Error "Public folder does not exist. Build the site first."
     exit 1
 }
 
-# Perform subtree split to push only the public folder to gh-pages
 try {
     git subtree split --prefix public -b gh-pages-deploy
-} catch {
-    Write-Error "Subtree split failed."
-    exit 1
-}
-
-# Push to gh-pages branch with force
-try {
     git push origin gh-pages-deploy:gh-pages --force
-} catch {
-    Write-Error "Failed to push to gh-pages branch."
     git branch -D gh-pages-deploy
+    Write-Host "Site deployed to GitHub Pages successfully."
+} catch {
+    Write-Error "Deployment to GitHub Pages failed."
     exit 1
 }
-
-# Delete the temporary branch
-git branch -D gh-pages-deploy
-
-Write-Host "All done! Site synced, processed, committed, built, and deployed to GitHub Pages."
